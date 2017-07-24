@@ -67,7 +67,7 @@ DarknetDetections processImageDetection(network& net,image& im, float thresh ){
     clock_t time;
     char buff[256];
     int j;
-    float nms=.4;
+    float nms=.3; //previous 0.4
 
     image sized = c_resize_image(im, net.w, net.h);
     layer l = net.layers[net.n-1];
@@ -101,19 +101,19 @@ DarknetDetections processImageDetection(network& net,image& im, float thresh ){
 
 DarknetDetections processImageDetection(network& net,const  cv::Mat & im, float thresh){
     image imDark= cv_to_image(im);
-    return processImageDetection(net,imDark,thresh);
+    auto detection= processImageDetection(net,imDark,thresh);
+    c_free_image(imDark);
+    return detection;
+
 }
 
 
 
 DarknetAPI::DarknetAPI(char *cfgfile, char *weightfile) {
     net = c_parse_network_cfg(cfgfile);
-    if (weightfile) {
+    if (weightfile != nullptr) {
         c_load_weights(&net, weightfile);
     }
-
-    fprintf(stderr, "4 \n");
-
 }
 DarknetAPI::~DarknetAPI(){
      c_free_network(net);
