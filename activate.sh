@@ -1,1 +1,1 @@
-export PYTHONPATH=:/home/frivas/devel/external/ownDarknet/darknet/code/python
+export PYTHONPATH=:/home/frivas/devel/mio/darknet/python

@@ -94,7 +94,9 @@ DarknetDetections processImageDetection(network& net,image& im, float thresh ){
 
 DarknetDetections processImageDetection(network& net,const  cv::Mat & im, float thresh){
     image imDark= cv_to_image(im);
-    return processImageDetection(net,imDark,thresh);
+    auto detection=processImageDetection(net,imDark,thresh);
+    c_free_image(imDark);
+    return detection;
 }
 
 
