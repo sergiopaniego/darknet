@@ -1,0 +1,5 @@
+classes= 1
+train  = data/train_yolod.txt
+valid  = data/test_yolod.txt
+names = data/yolod.names
+backup = backup/yolod
