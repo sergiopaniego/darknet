@@ -463,7 +463,8 @@ void show_image_cv(image p, const char *name, IplImage *disp)
     for(y = 0; y < p.h; ++y){
         for(x = 0; x < p.w; ++x){
             for(k= 0; k < p.c; ++k){
-                disp->imageData[y*step + x*p.c + k] = (unsigned char)(get_pixel(p,x,y,k)*255);
+                //changed here X 2
+                disp->imageData[y*step + x*p.c + k] = (unsigned short)(get_pixel(p,x,y,k)*65535);
             }
         }
     }
@@ -486,7 +487,8 @@ void show_image_cv(image p, const char *name, IplImage *disp)
 void show_image(image p, const char *name)
 {
 #ifdef OPENCV
-    IplImage *disp = cvCreateImage(cvSize(p.w,p.h), IPL_DEPTH_8U, p.c);
+    //changed here
+    IplImage *disp = cvCreateImage(cvSize(p.w,p.h), IPL_DEPTH_16U, p.c);
     image copy = copy_image(p);
     constrain_image(copy);
     show_image_cv(copy, name, disp);
@@ -502,7 +504,11 @@ void show_image(image p, const char *name)
 
 void ipl_into_image(IplImage* src, image im)
 {
-    unsigned char *data = (unsigned char *)src->imageData;
+    fprintf(stderr, "%d", src->depth);
+    if (src->depth == 16)
+        fprintf(stderr, "Yo16\n");
+    //changed here
+    unsigned short *data = (unsigned short *)src->imageData;
     int h = src->height;
     int w = src->width;
     int c = src->nChannels;
@@ -512,7 +518,7 @@ void ipl_into_image(IplImage* src, image im)
     for(i = 0; i < h; ++i){
         for(k= 0; k < c; ++k){
             for(j = 0; j < w; ++j){
-                im.data[k*w*h + i*w + j] = data[i*step + j*c + k]/255.;
+                im.data[k*w*h + i*w + j] = data[i*step + j*c + k]/65535.;
             }
         }
     }
@@ -538,7 +544,10 @@ image load_image_cv(char *filename, int channels)
     else {
         fprintf(stderr, "OpenCV can't force load with %d channels\n", channels);
     }
-
+    
+    //changed here (-1 is load as is)
+    flag = -1;
+    fprintf(stderr, "Yo\n");
     if( (src = cvLoadImage(filename, flag)) == 0 )
     {
         fprintf(stderr, "Cannot load image \"%s\"\n", filename);
@@ -589,12 +598,14 @@ void save_image_jpg(image p, const char *name)
     char buff[256];
     sprintf(buff, "%s.jpg", name);
 
-    IplImage *disp = cvCreateImage(cvSize(p.w,p.h), IPL_DEPTH_8U, p.c);
+    //changed here
+    IplImage *disp = cvCreateImage(cvSize(p.w,p.h), IPL_DEPTH_16U, p.c);
     int step = disp->widthStep;
     for(y = 0; y < p.h; ++y){
         for(x = 0; x < p.w; ++x){
             for(k= 0; k < p.c; ++k){
-                disp->imageData[y*step + x*p.c + k] = (unsigned char)(get_pixel(copy,x,y,k)*255);
+                //changed here X 2
+                disp->imageData[y*step + x*p.c + k] = (unsigned short)(get_pixel(copy,x,y,k)*65535);
             }
         }
     }
@@ -609,11 +620,13 @@ void save_image_png(image im, const char *name)
     char buff[256];
     //sprintf(buff, "%s (%d)", name, windows);
     sprintf(buff, "%s.png", name);
-    unsigned char *data = calloc(im.w*im.h*im.c, sizeof(char));
+    //changed here
+    unsigned short *data = calloc(im.w*im.h*im.c, sizeof(short));
     int i,k;
     for(k = 0; k < im.c; ++k){
         for(i = 0; i < im.w*im.h; ++i){
-            data[i*im.c+k] = (unsigned char) (255*im.data[i + k*im.w*im.h]);
+            //changed here X 2
+            data[i*im.c+k] = (unsigned short) (65535*im.data[i + k*im.w*im.h]);
         }
     }
     int success = stbi_write_png(buff, im.w, im.h, im.c, data, im.w*im.c);
@@ -665,10 +678,6 @@ image make_image(int w, int h, int c)
     image out = make_empty_image(w,h,c);
     out.data = calloc(h*w*c, sizeof(float));
     return out;
-}
-
-image c_make_image(int w, int h, int c){
-    return make_image(w,h,c);
 }
 
 image make_random_image(int w, int h, int c)
@@ -923,10 +932,6 @@ image resize_min(image im, int min)
     if(w == im.w && h == im.h) return im;
     image resized = resize_image(im, w, h);
     return resized;
-}
-
-image c_resize_image(image im, int w, int h) {
-    return resize_image(im, w, h);
 }
 
 image random_crop_image(image im, int w, int h)
@@ -1376,7 +1381,9 @@ void test_resize(char *filename)
 image load_image_stb(char *filename, int channels)
 {
     int w, h, c;
-    unsigned char *data = stbi_load(filename, &w, &h, &c, channels);
+    //changed here
+    unsigned short *data = stbi_load_16(filename, &w, &h, &c, channels);
+    //fprintf(stderr, "Yoload\n");
     if (!data) {
         fprintf(stderr, "Cannot load image \"%s\"\nSTB Reason: %s\n", filename, stbi_failure_reason());
         exit(0);
@@ -1389,13 +1396,17 @@ image load_image_stb(char *filename, int channels)
             for(i = 0; i < w; ++i){
                 int dst_index = i + w*j + w*h*k;
                 int src_index = k + c*i + c*w*j;
-                im.data[dst_index] = (float)data[src_index]/255.;
+                //changed here X 2
+                im.data[dst_index] = (float)data[src_index]/65535.;
             }
         }
     }
+    //fprintf(stderr, "Yoload\n");
     free(data);
+    //fprintf(stderr, "Yoload\n");
     return im;
 }
+
 
 image load_image(char *filename, int w, int h, int c)
 {
@@ -1576,9 +1587,4 @@ void free_image(image m)
     if(m.data){
         free(m.data);
     }
-}
-
-
-void c_free_image(image m){
-    free_image(m);
 }

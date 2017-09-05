@@ -351,11 +351,6 @@ void set_batch_network(network *net, int b)
     }
 }
 
-
-void c_set_batch_network(network *net, int b){
-    set_batch_network(net,b);
-}
-
 int resize_network(network *net, int w, int h)
 {
 #ifdef GPU
@@ -499,11 +494,6 @@ float *network_predict(network net, float *input)
     return net.output;
 }
 
-
-float *c_network_predict(network net, float *input){
-    return network_predict(net, input);
-}
-
 int num_boxes(network *net)
 {
     layer l = net->layers[net->n-1];
@@ -534,7 +524,6 @@ void network_detect(network *net, image im, float thresh, float hier_thresh, flo
         get_region_boxes(l, im.w, im.h, net->w, net->h, thresh, probs, boxes, 0, 0, 0, hier_thresh, 0);
         if (nms) do_nms_sort(boxes, probs, l.w*l.h*l.n, l.classes, nms);
     }
-
 }
 
 float *network_predict_p(network *net, float *input)
@@ -692,11 +681,6 @@ void free_network(network net)
     if(net.input_gpu) cuda_free(net.input_gpu);
     if(net.truth_gpu) cuda_free(net.truth_gpu);
 #endif
-}
-
-
-void c_free_network(network net){
-    free_network(net);
 }
 
 // Some day...
