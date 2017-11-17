@@ -6,8 +6,8 @@ include_directories(${CMAKE_CURRENT_LIST_DIR}/../ ${CMAKE_CURRENT_LIST_DIR}/../i
 cuda_add_executable(darknetTest main.cpp)
 
 target_link_libraries(darknetTest
-        darknetAPILib
         darknetExamplesLib
+        darknetAPILib
         darknetLib
         pthread
         m

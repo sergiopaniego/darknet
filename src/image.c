@@ -898,6 +898,11 @@ image letterbox_image(image im, int w, int h)
     return boxed;
 }
 
+image c_letterbox_image(image im, int w, int h){
+    return letterbox_image(im,w,h);
+}
+
+
 image resize_max(image im, int max)
 {
     int w = im.w;
