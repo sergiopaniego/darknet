@@ -45,6 +45,7 @@ ENDIF()
 #Cuda
 FIND_PACKAGE(OpenCV REQUIRED)
 FIND_PACKAGE(CUDA REQUIRED)
+FIND_PACKAGE(Boost REQUIRED)
 
 
 
@@ -67,17 +68,10 @@ set(HEADER_DESTINATION "${CMAKE_INSTALL_PREFIX}/include" CACHE STRING "include d
 add_subdirectory(src)
 add_subdirectory(examples)
 add_subdirectory(DarknetAPI)
-#add_subdirectory(python)
 add_subdirectory(test)
 
 
 
-
-SET(RUNME_SCRIPT ${PROJECT_SOURCE_DIR}/activate.sh)
-IF (EXISTS ${RUNME_SCRIPT})
-    file(REMOVE ${RUNME_SCRIPT})
-ENDIF()
-file(APPEND ${RUNME_SCRIPT} "export PYTHONPATH=${NUMPY-OPENCV-CONVERTER_PATH}:${PROJECT_SOURCE_DIR}/python\n")
 
 
 
