@@ -12,9 +12,6 @@ file(GLOB_RECURSE darknet_EXAMPLES_SOURCES "*.c")
 
 set (darknet_EXAMPLES_SOURCES
 	${darknet_EXAMPLES_SOURCES}
-#	DarknetAPI/DarknetAPI
-#	DarknetAPI/DarknetAPIConversions
-#	DarknetAPI/DarknetDetection
 )
 
 
@@ -39,11 +36,10 @@ target_link_libraries(darknet
         darknetAPILib
         darknetExamplesLib
         darknetLib
+        ${OpenCV_LIBRARIES}
+        ${CUDA_LIBRARIES}
         pthread
         m
-        ${Darknet_LINKER_LIBS}
-        ${CUDA_LIBRARIES}
-        ${OpenCV_LIBRARIES}
         cudart
         cublas
         curand

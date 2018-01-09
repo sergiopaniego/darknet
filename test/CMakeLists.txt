@@ -9,11 +9,10 @@ target_link_libraries(darknetTest
         darknetExamplesLib
         darknetAPILib
         darknetLib
+        ${OpenCV_LIBRARIES}
+        ${CUDA_LIBRARIES}
         pthread
         m
-        ${Darknet_LINKER_LIBS}
-        ${CUDA_LIBRARIES}
-        ${OpenCV_LIBRARIES}
         cudart
         cublas
         curand
