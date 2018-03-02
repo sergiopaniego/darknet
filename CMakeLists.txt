@@ -47,7 +47,7 @@ FIND_PACKAGE(OpenCV REQUIRED)
 FIND_PACKAGE(CUDA REQUIRED)
 FIND_PACKAGE(Boost REQUIRED)
 
-
+link_directories(/usr/local/cuda/lib64/)
 
 
 ####################################################################
