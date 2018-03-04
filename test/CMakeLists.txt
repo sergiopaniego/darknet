@@ -13,7 +13,7 @@ target_link_libraries(darknetTest
         ${CUDA_LIBRARIES}
         pthread
         m
-        cudart
-        cublas
-        curand
+        ${CUDA_LIBRARIES}
+        ${CUDA_CUBLAS_LIBRARIES}
+        ${CUDA_curand_LIBRARY}
     )
