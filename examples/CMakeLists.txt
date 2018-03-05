@@ -37,7 +37,6 @@ target_link_libraries(darknet
         darknetExamplesLib
         darknetLib
         ${OpenCV_LIBRARIES}
-        ${CUDA_LIBRARIES}
         pthread
         m
         ${CUDA_LIBRARIES}
