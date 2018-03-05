@@ -10,7 +10,6 @@ target_link_libraries(darknetTest
         darknetAPILib
         darknetLib
         ${OpenCV_LIBRARIES}
-        ${CUDA_LIBRARIES}
         pthread
         m
         ${CUDA_LIBRARIES}
