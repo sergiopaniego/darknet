@@ -15,10 +15,16 @@ set (darknet_EXAMPLES_SOURCES
 )
 
 
-message("lll: " ${darknet_EXAMPLES_SOURCES})
-
 include_directories( ${CMAKE_CURRENT_LIST_DIR}/../include ${CMAKE_CURRENT_LIST_DIR} ${OPENCV_INCLUDE_DIR} ${RAPIDJSON_INCLUDE_DIR})
-cuda_add_library (darknetExamplesLib ${darknet_EXAMPLES_SOURCES} SHARED)
+
+if(USE_GPU)
+  cuda_add_library (darknetExamplesLib ${darknet_EXAMPLES_SOURCES} SHARED)
+else()
+  add_library (darknetExamplesLib SHARED ${darknet_EXAMPLES_SOURCES} )
+endif(USE_GPU)
+
+target_link_libraries(darknetExamplesLib darknetLib)
+
 install(TARGETS darknetExamplesLib LIBRARY DESTINATION ${LIB_DESTINATION} ARCHIVE DESTINATION ${LIB_DESTINATION} RUNTIME DESTINATION ${LIB_DESTINATION})
 
 file(GLOB filesA *.h)
@@ -29,8 +35,11 @@ install(FILES  ${filesB} DESTINATION  ${HEADER_DESTINATION}/DarknetAPI)
 
 
 
-
-cuda_add_executable(darknet darknet.c)
+if(USE_GPU)
+  cuda_add_executable(darknet darknet.c)
+else()
+  add_executable(darknet darknet.c)
+endif(USE_GPU)
 
 target_link_libraries(darknet
         darknetAPILib
@@ -43,5 +52,3 @@ target_link_libraries(darknet
         ${CUDA_CUBLAS_LIBRARIES}
         ${CUDA_curand_LIBRARY}
         )
-
-

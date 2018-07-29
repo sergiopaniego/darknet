@@ -44,10 +44,11 @@ ENDIF()
 
 #Cuda
 FIND_PACKAGE(OpenCV REQUIRED)
-FIND_PACKAGE(CUDA REQUIRED)
 FIND_PACKAGE(Boost REQUIRED)
 
-
+IF(USE_GPU)
+	FIND_PACKAGE(CUDA REQUIRED)
+ENDIF(USE_GPU)
 
 
 ####################################################################
@@ -55,7 +56,7 @@ FIND_PACKAGE(Boost REQUIRED)
 ######           SET COMPILLER OPTIONS                        ######
 ####################################################################
 ####################################################################
-add_definitions(-std=c++0x)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 add_definitions(-fPIC)
 ####################################################################
 ####################################################################
@@ -70,8 +71,6 @@ add_subdirectory(examples)
 add_subdirectory(DarknetAPI)
 add_subdirectory(test)
 
-
-
-
-
-
+add_custom_target(uninstall
+    "${CMAKE_COMMAND}" -P "${CMAKE_SOURCE_DIR}/uninstall.cmake"
+)
