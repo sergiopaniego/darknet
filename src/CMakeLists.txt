@@ -26,8 +26,14 @@ include_directories( ${CMAKE_CURRENT_LIST_DIR}/../include ${CMAKE_CURRENT_LIST_D
 
 
 
+
 if(USE_GPU)
   cuda_add_library (darknetLib ${darknet_SOURCES} ${gpu_SRCS} SHARED)
+   target_link_libraries(darknetLib
+        ${CUDA_LIBRARIES}
+        ${CUDA_CUBLAS_LIBRARIES}
+        ${CUDA_curand_LIBRARY}
+    )
 else()
   add_library (darknetLib SHARED ${darknet_HEADERS} ${darknet_SOURCES})
 endif(USE_GPU)
