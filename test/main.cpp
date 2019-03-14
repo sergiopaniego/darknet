@@ -6,7 +6,7 @@
 
 #include <DarknetAPI/DarknetAPI.h>
 #include <iostream>
-#include <highgui.h>
+#include <opencv2/highgui.hpp>
 #include <opencv2/opencv.hpp>
 #include <boost/shared_ptr.hpp>
 
