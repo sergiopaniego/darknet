@@ -138,7 +138,7 @@ void train_go(char *cfgfile, char *weightfile, char *filename, int *gpus, int ng
     char *base = basecfg(cfgfile);
     printf("%s\n", base);
     printf("%d\n", ngpus);
-    network **nets = calloc(ngpus, sizeof(network*));
+    network *nets = calloc(ngpus, sizeof(network));
 
     srand(time(0));
     int seed = rand();
@@ -148,10 +148,10 @@ void train_go(char *cfgfile, char *weightfile, char *filename, int *gpus, int ng
         cuda_set_device(gpus[i]);
 #endif
         nets[i] = load_network(cfgfile, weightfile, clear);
-        nets[i]->learning_rate *= ngpus;
+        nets[i].learning_rate *= ngpus;
     }
-    network *net = nets[0];
-    printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net->learning_rate, net->momentum, net->decay);
+    network net = nets[0];
+    printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net.learning_rate, net.momentum, net.decay);
 
     char *backup_directory = "/home/pjreddie/backup/";
 
@@ -161,11 +161,11 @@ void train_go(char *cfgfile, char *weightfile, char *filename, int *gpus, int ng
 
     int N = m.n;
     printf("Moves: %d\n", N);
-    int epoch = (*net->seen)/N;
-    while(get_current_batch(net) < net->max_batches || net->max_batches == 0){
+    int epoch = (*net.seen)/N;
+    while(get_current_batch(net) < net.max_batches || net.max_batches == 0){
         double time=what_time_is_it_now();
 
-        data train = random_go_moves(m, net->batch*net->subdivisions*ngpus);
+        data train = random_go_moves(m, net.batch*net.subdivisions*ngpus);
         printf("Loaded: %lf seconds\n", what_time_is_it_now() - time);
         time=what_time_is_it_now();
 
@@ -183,9 +183,9 @@ void train_go(char *cfgfile, char *weightfile, char *filename, int *gpus, int ng
 
         if(avg_loss == -1) avg_loss = loss;
         avg_loss = avg_loss*.95 + loss*.05;
-        printf("%ld, %.3f: %f, %f avg, %f rate, %lf seconds, %ld images\n", get_current_batch(net), (float)(*net->seen)/N, loss, avg_loss, get_current_rate(net), what_time_is_it_now()-time, *net->seen);
-        if(*net->seen/N > epoch){
-            epoch = *net->seen/N;
+        printf("%ld, %.3f: %f, %f avg, %f rate, %lf seconds, %ld images\n", get_current_batch(net), (float)(*net.seen)/N, loss, avg_loss, get_current_rate(net), what_time_is_it_now()-time, *net.seen);
+        if(*net.seen/N > epoch){
+            epoch = *net.seen/N;
             char buff[256];
             sprintf(buff, "%s/%s_%d.weights", backup_directory,base, epoch);
             save_weights(net, buff);
@@ -294,7 +294,7 @@ void flip_board(float *board)
     }
 }
 
-float predict_move2(network *net, float *board, float *move, int multi)
+float predict_move2(network net, float *board, float *move, int multi)
 {
     float *output = network_predict(net, board);
     copy_cpu(19*19+1, output, 1, move, 1);
@@ -390,9 +390,9 @@ void free_mcts(mcts_tree *root)
     free(root);
 }
 
-float *network_predict_rotations(network *net, float *next)
+float *network_predict_rotations(network net, float *next)
 {
-    int n = net->batch;
+    int n = net.batch;
     float *in = calloc(19*19*3*n, sizeof(float));
     image im = float_to_image(19, 19, 3, next);
     int i,j;
@@ -421,7 +421,7 @@ float *network_predict_rotations(network *net, float *next)
     return pred;
 }
 
-mcts_tree *expand(float *next, float *ko, network *net)
+mcts_tree *expand(float *next, float *ko, network net)
 {
     mcts_tree *root = calloc(1, sizeof(mcts_tree));
     root->board = next;
@@ -458,7 +458,7 @@ float *copy_board(float *board)
     return next;
 }
 
-float select_mcts(mcts_tree *root, network *net, float *prev, float cpuct)
+float select_mcts(mcts_tree *root, network net, float *prev, float cpuct)
 {
     if(root->done) return -root->result;
     int i;
@@ -507,7 +507,7 @@ float select_mcts(mcts_tree *root, network *net, float *prev, float cpuct)
     return -val;
 }
 
-mcts_tree *run_mcts(mcts_tree *tree, network *net, float *board, float *ko, int player, int n, float cpuct, float secs)
+mcts_tree *run_mcts(mcts_tree *tree, network net, float *board, float *ko, int player, int n, float cpuct, float secs)
 {
     int i;
     double t = what_time_is_it_now();
@@ -735,9 +735,9 @@ void valid_go(char *cfgfile, char *weightfile, int multi, char *filename)
     srand(time(0));
     char *base = basecfg(cfgfile);
     printf("%s\n", base);
-    network *net = load_network(cfgfile, weightfile, 0);
-    set_batch_network(net, 1);
-    printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net->learning_rate, net->momentum, net->decay);
+    network net = load_network(cfgfile, weightfile, 0);
+    set_batch_network(&net, 1);
+    printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net.learning_rate, net.momentum, net.decay);
 
     float *board = calloc(19*19*3, sizeof(float));
     float *move = calloc(19*19+2, sizeof(float));
@@ -797,7 +797,7 @@ int stdin_ready()
     return 0;
 }
 
-mcts_tree *ponder(mcts_tree *tree, network *net, float *b, float *ko, int player, float cpuct)
+mcts_tree *ponder(mcts_tree *tree, network net, float *b, float *ko, int player, float cpuct)
 {
     double t = what_time_is_it_now();
     int count = 0;
@@ -813,8 +813,8 @@ mcts_tree *ponder(mcts_tree *tree, network *net, float *b, float *ko, int player
 void engine_go(char *filename, char *weightfile, int mcts_iters, float secs, float temp, float cpuct, int anon, int resign)
 {
     mcts_tree *root = 0;
-    network *net = load_network(filename, weightfile, 0);
-    set_batch_network(net, 1);
+    network net = load_network(filename, weightfile, 0);
+    set_batch_network(&net, 1);
     srand(time(0));
     float *board = calloc(19*19*3, sizeof(float));
     flip_board(board);
@@ -1098,8 +1098,8 @@ void engine_go(char *filename, char *weightfile, int mcts_iters, float secs, flo
 void test_go(char *cfg, char *weights, int multi)
 {
     int i;
-    network *net = load_network(cfg, weights, 0);
-    set_batch_network(net, 1);
+    network net = load_network(cfg, weights, 0);
+    set_batch_network(&net, 1);
     srand(time(0));
     float *board = calloc(19*19*3, sizeof(float));
     flip_board(board);
@@ -1214,19 +1214,19 @@ void self_go(char *filename, char *weightfile, char *f2, char *w2, int multi)
 {
     mcts_tree *tree1 = 0;
     mcts_tree *tree2 = 0;
-    network *net = load_network(filename, weightfile, 0);
+    network net = load_network(filename, weightfile, 0);
     //set_batch_network(net, 1);
 
-    network *net2;
+    network net2;
     if (f2) {
         net2 = parse_network_cfg(f2);
         if(w2){
-            load_weights(net2, w2);
+            load_weights(&net2, w2);
         }
-    } else {
+    /*} else {
         net2 = calloc(1, sizeof(network));
         *net2 = *net;
-    }
+    */}
     srand(time(0));
     char boards[600][93];
     int count = 0;
@@ -1282,7 +1282,7 @@ void self_go(char *filename, char *weightfile, char *f2, char *w2, int multi)
             //mcts_iters = 500;
             cpuct = 1;
         }
-        network *use = ((total%2==0) == (player==1)) ? net : net2;
+        network use = ((total%2==0) == (player==1)) ? net : net2;
         mcts_tree *t = ((total%2==0) == (player==1)) ? tree1 : tree2;
         t = run_mcts(t, use, board, two, player, mcts_iters, cpuct, 0);
         move m = pick_move(t, temp, player);

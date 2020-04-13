@@ -23,7 +23,7 @@ void train_classifier(char *datacfg, char *cfgfile, char *weightfile, int *gpus,
     char *base = basecfg(cfgfile);
     printf("%s\n", base);
     printf("%d\n", ngpus);
-    network **nets = calloc(ngpus, sizeof(network*));
+    network *nets = calloc(ngpus, sizeof(network));
 
     srand(time(0));
     int seed = rand();
@@ -33,14 +33,14 @@ void train_classifier(char *datacfg, char *cfgfile, char *weightfile, int *gpus,
         cuda_set_device(gpus[i]);
 #endif
         nets[i] = load_network(cfgfile, weightfile, clear);
-        nets[i]->learning_rate *= ngpus;
+        nets[i].learning_rate *= ngpus;
     }
     srand(time(0));
-    network *net = nets[0];
+    network net = nets[0];
 
-    int imgs = net->batch * net->subdivisions * ngpus;
+    int imgs = net.batch * net.subdivisions * ngpus;
 
-    printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net->learning_rate, net->momentum, net->decay);
+    printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net.learning_rate, net.momentum, net.decay);
     list *options = read_data_cfg(datacfg);
 
     char *backup_directory = option_find_str(options, "backup", "/backup/");
@@ -48,7 +48,7 @@ void train_classifier(char *datacfg, char *cfgfile, char *weightfile, int *gpus,
     char *label_list = option_find_str(options, "labels", "data/labels.list");
     char *train_list = option_find_str(options, "train", "data/train.list");
     char *tree = option_find_str(options, "tree", 0);
-    if (tree) net->hierarchy = read_tree(tree);
+    if (tree) net.hierarchy = read_tree(tree);
     int classes = option_find_int(options, "classes", 2);
 
     char **labels = 0;
@@ -62,20 +62,20 @@ void train_classifier(char *datacfg, char *cfgfile, char *weightfile, int *gpus,
     double time;
 
     load_args args = {0};
-    args.w = net->w;
-    args.h = net->h;
+    args.w = net.w;
+    args.h = net.h;
     args.threads = 32;
-    args.hierarchy = net->hierarchy;
+    args.hierarchy = net.hierarchy;
 
-    args.min = net->min_ratio*net->w;
-    args.max = net->max_ratio*net->w;
+    args.min = net.min_ratio*net.w;
+    args.max = net.max_ratio*net.w;
     printf("%d %d\n", args.min, args.max);
-    args.angle = net->angle;
-    args.aspect = net->aspect;
-    args.exposure = net->exposure;
-    args.saturation = net->saturation;
-    args.hue = net->hue;
-    args.size = net->w;
+    args.angle = net.angle;
+    args.aspect = net.aspect;
+    args.exposure = net.exposure;
+    args.saturation = net.saturation;
+    args.hue = net.hue;
+    args.size = net.w;
 
     args.paths = paths;
     args.classes = classes;
@@ -95,9 +95,9 @@ void train_classifier(char *datacfg, char *cfgfile, char *weightfile, int *gpus,
     load_thread = load_data(args);
 
     int count = 0;
-    int epoch = (*net->seen)/N;
-    while(get_current_batch(net) < net->max_batches || net->max_batches == 0){
-        if(net->random && count++%40 == 0){
+    int epoch = (*net.seen)/N;
+    while(get_current_batch(net) < net.max_batches || net.max_batches == 0){
+        if(net.random && count++%40 == 0){
             printf("Resizing\n");
             int dim = (rand() % 11 + 4) * 32;
             //if (get_current_batch(net)+200 > net->max_batches) dim = 608;
@@ -106,8 +106,8 @@ void train_classifier(char *datacfg, char *cfgfile, char *weightfile, int *gpus,
             args.w = dim;
             args.h = dim;
             args.size = dim;
-            args.min = net->min_ratio*dim;
-            args.max = net->max_ratio*dim;
+            args.min = net.min_ratio*dim;
+            args.max = net.max_ratio*dim;
             printf("%d %d\n", args.min, args.max);
 
             pthread_join(load_thread, 0);
@@ -116,7 +116,7 @@ void train_classifier(char *datacfg, char *cfgfile, char *weightfile, int *gpus,
             load_thread = load_data(args);
 
             for(i = 0; i < ngpus; ++i){
-                resize_network(nets[i], dim, dim);
+                resize_network(&nets[i], dim, dim);
             }
             net = nets[0];
         }
@@ -141,10 +141,10 @@ void train_classifier(char *datacfg, char *cfgfile, char *weightfile, int *gpus,
 #endif
         if(avg_loss == -1) avg_loss = loss;
         avg_loss = avg_loss*.9 + loss*.1;
-        printf("%ld, %.3f: %f, %f avg, %f rate, %lf seconds, %ld images\n", get_current_batch(net), (float)(*net->seen)/N, loss, avg_loss, get_current_rate(net), what_time_is_it_now()-time, *net->seen);
+        printf("%ld, %.3f: %f, %f avg, %f rate, %lf seconds, %ld images\n", get_current_batch(net), (float)(*net.seen)/N, loss, avg_loss, get_current_rate(net), what_time_is_it_now()-time, *net.seen);
         free_data(train);
-        if(*net->seen/N > epoch){
-            epoch = *net->seen/N;
+        if(*net.seen/N > epoch){
+            epoch = *net.seen/N;
             char buff[256];
             sprintf(buff, "%s/%s_%d.weights",backup_directory,base, epoch);
             save_weights(net, buff);
@@ -170,7 +170,7 @@ void train_classifier(char *datacfg, char *cfgfile, char *weightfile, int *gpus,
 void validate_classifier_crop(char *datacfg, char *filename, char *weightfile)
 {
     int i = 0;
-    network *net = load_network(filename, weightfile, 0);
+    network net = load_network(filename, weightfile, 0);
     srand(time(0));
 
     list *options = read_data_cfg(datacfg);
@@ -196,8 +196,8 @@ void validate_classifier_crop(char *datacfg, char *filename, char *weightfile)
     data val, buffer;
 
     load_args args = {0};
-    args.w = net->w;
-    args.h = net->h;
+    args.w = net.w;
+    args.h = net.h;
 
     args.paths = paths;
     args.classes = classes;
@@ -234,8 +234,8 @@ void validate_classifier_crop(char *datacfg, char *filename, char *weightfile)
 void validate_classifier_10(char *datacfg, char *filename, char *weightfile)
 {
     int i, j;
-    network *net = load_network(filename, weightfile, 0);
-    set_batch_network(net, 1);
+    network net = load_network(filename, weightfile, 0);
+    set_batch_network(&net, 1);
     srand(time(0));
 
     list *options = read_data_cfg(datacfg);
@@ -265,8 +265,8 @@ void validate_classifier_10(char *datacfg, char *filename, char *weightfile)
                 break;
             }
         }
-        int w = net->w;
-        int h = net->h;
+        int w = net.w;
+        int h = net.h;
         int shift = 32;
         image im = load_image_color(paths[i], w+shift, h+shift);
         image images[10];
@@ -284,7 +284,7 @@ void validate_classifier_10(char *datacfg, char *filename, char *weightfile)
         float *pred = calloc(classes, sizeof(float));
         for(j = 0; j < 10; ++j){
             float *p = network_predict(net, images[j].data);
-            if(net->hierarchy) hierarchy_predictions(p, net->outputs, net->hierarchy, 1, 1);
+            if(net.hierarchy) hierarchy_predictions(p, net.outputs, net.hierarchy, 1, 1);
             axpy_cpu(classes, 1, p, 1, pred, 1);
             free_image(images[j]);
         }
@@ -303,8 +303,8 @@ void validate_classifier_10(char *datacfg, char *filename, char *weightfile)
 void validate_classifier_full(char *datacfg, char *filename, char *weightfile)
 {
     int i, j;
-    network *net = load_network(filename, weightfile, 0);
-    set_batch_network(net, 1);
+    network net = load_network(filename, weightfile, 0);
+    set_batch_network(&net, 1);
     srand(time(0));
 
     list *options = read_data_cfg(datacfg);
@@ -325,7 +325,7 @@ void validate_classifier_full(char *datacfg, char *filename, char *weightfile)
     float avg_topk = 0;
     int *indexes = calloc(topk, sizeof(int));
 
-    int size = net->w;
+    int size = net.w;
     for(i = 0; i < m; ++i){
         int class = -1;
         char *path = paths[i];
@@ -337,12 +337,12 @@ void validate_classifier_full(char *datacfg, char *filename, char *weightfile)
         }
         image im = load_image_color(paths[i], 0, 0);
         image resized = resize_min(im, size);
-        resize_network(net, resized.w, resized.h);
+        resize_network(&net, resized.w, resized.h);
         //show_image(im, "orig");
         //show_image(crop, "cropped");
         //cvWaitKey(0);
         float *pred = network_predict(net, resized.data);
-        if(net->hierarchy) hierarchy_predictions(pred, net->outputs, net->hierarchy, 1, 1);
+        if(net.hierarchy) hierarchy_predictions(pred, net.outputs, net.hierarchy, 1, 1);
 
         free_image(im);
         free_image(resized);
@@ -361,15 +361,15 @@ void validate_classifier_full(char *datacfg, char *filename, char *weightfile)
 void validate_classifier_single(char *datacfg, char *filename, char *weightfile)
 {
     int i, j;
-    network *net = load_network(filename, weightfile, 0);
-    set_batch_network(net, 1);
+    network net = load_network(filename, weightfile, 0);
+    set_batch_network(&net, 1);
     srand(time(0));
 
     list *options = read_data_cfg(datacfg);
 
     char *label_list = option_find_str(options, "labels", "data/labels.list");
     char *leaf_list = option_find_str(options, "leaves", 0);
-    if(leaf_list) change_leaves(net->hierarchy, leaf_list);
+    if(leaf_list) change_leaves(net.hierarchy, leaf_list);
     char *valid_list = option_find_str(options, "valid", "data/train.list");
     int classes = option_find_int(options, "classes", 2);
     int topk = option_find_int(options, "top", 1);
@@ -395,13 +395,13 @@ void validate_classifier_single(char *datacfg, char *filename, char *weightfile)
             }
         }
         image im = load_image_color(paths[i], 0, 0);
-        image crop = center_crop_image(im, net->w, net->h);
+        image crop = center_crop_image(im, net.w, net.h);
         //grayscale_image_3c(crop);
         //show_image(im, "orig");
         //show_image(crop, "cropped");
         //cvWaitKey(0);
         float *pred = network_predict(net, crop.data);
-        if(net->hierarchy) hierarchy_predictions(pred, net->outputs, net->hierarchy, 1, 1);
+        if(net.hierarchy) hierarchy_predictions(pred, net.outputs, net.hierarchy, 1, 1);
 
         free_image(im);
         free_image(crop);
@@ -420,8 +420,8 @@ void validate_classifier_single(char *datacfg, char *filename, char *weightfile)
 void validate_classifier_multi(char *datacfg, char *cfg, char *weights)
 {
     int i, j;
-    network *net = load_network(cfg, weights, 0);
-    set_batch_network(net, 1);
+    network net = load_network(cfg, weights, 0);
+    set_batch_network(&net, 1);
     srand(time(0));
 
     list *options = read_data_cfg(datacfg);
@@ -458,9 +458,9 @@ void validate_classifier_multi(char *datacfg, char *cfg, char *weights)
         image im = load_image_color(paths[i], 0, 0);
         for(j = 0; j < nscales; ++j){
             image r = resize_max(im, scales[j]);
-            resize_network(net, r.w, r.h);
+            resize_network(&net, r.w, r.h);
             float *p = network_predict(net, r.data);
-            if(net->hierarchy) hierarchy_predictions(p, net->outputs, net->hierarchy, 1 , 1);
+            if(net.hierarchy) hierarchy_predictions(p, net.outputs, net.hierarchy, 1 , 1);
             axpy_cpu(classes, 1, p, 1, pred, 1);
             flip_image(r);
             p = network_predict(net, r.data);
@@ -481,8 +481,8 @@ void validate_classifier_multi(char *datacfg, char *cfg, char *weights)
 
 void try_classifier(char *datacfg, char *cfgfile, char *weightfile, char *filename, int layer_num)
 {
-    network *net = load_network(cfgfile, weightfile, 0);
-    set_batch_network(net, 1);
+    network net = load_network(cfgfile, weightfile, 0);
+    set_batch_network(&net, 1);
     srand(2222222);
 
     list *options = read_data_cfg(datacfg);
@@ -523,7 +523,7 @@ void try_classifier(char *datacfg, char *cfgfile, char *weightfile, char *filena
         time=clock();
         float *predictions = network_predict(net, X);
 
-        layer l = net->layers[layer_num];
+        layer l = net.layers[layer_num];
         for(i = 0; i < l.c; ++i){
             if(l.rolling_mean) printf("%f %f %f\n", l.rolling_mean[i], l.rolling_variance[i], l.scales[i]);
         }
@@ -559,8 +559,8 @@ void try_classifier(char *datacfg, char *cfgfile, char *weightfile, char *filena
 
 void predict_classifier(char *datacfg, char *cfgfile, char *weightfile, char *filename, int top)
 {
-    network *net = load_network(cfgfile, weightfile, 0);
-    set_batch_network(net, 1);
+    network net = load_network(cfgfile, weightfile, 0);
+    set_batch_network(&net, 1);
     srand(2222222);
 
     list *options = read_data_cfg(datacfg);
@@ -586,7 +586,7 @@ void predict_classifier(char *datacfg, char *cfgfile, char *weightfile, char *fi
             strtok(input, "\n");
         }
         image im = load_image_color(input, 0, 0);
-        image r = letterbox_image(im, net->w, net->h);
+        image r = letterbox_image(im, net.w, net.h);
         //image r = resize_min(im, 320);
         //printf("%d %d\n", r.w, r.h);
         //resize_network(net, r.w, r.h);
@@ -595,8 +595,8 @@ void predict_classifier(char *datacfg, char *cfgfile, char *weightfile, char *fi
         float *X = r.data;
         time=clock();
         float *predictions = network_predict(net, X);
-        if(net->hierarchy) hierarchy_predictions(predictions, net->outputs, net->hierarchy, 1, 1);
-        top_k(predictions, net->outputs, top, indexes);
+        if(net.hierarchy) hierarchy_predictions(predictions, net.outputs, net.hierarchy, 1, 1);
+        top_k(predictions, net.outputs, top, indexes);
         fprintf(stderr, "%s: Predicted in %f seconds.\n", input, sec(clock()-time));
         for(i = 0; i < top; ++i){
             int index = indexes[i];
@@ -614,8 +614,8 @@ void predict_classifier(char *datacfg, char *cfgfile, char *weightfile, char *fi
 void label_classifier(char *datacfg, char *filename, char *weightfile)
 {
     int i;
-    network *net = load_network(filename, weightfile, 0);
-    set_batch_network(net, 1);
+    network net = load_network(filename, weightfile, 0);
+    set_batch_network(&net, 1);
     srand(time(0));
 
     list *options = read_data_cfg(datacfg);
@@ -633,8 +633,8 @@ void label_classifier(char *datacfg, char *filename, char *weightfile)
 
     for(i = 0; i < m; ++i){
         image im = load_image_color(paths[i], 0, 0);
-        image resized = resize_min(im, net->w);
-        image crop = crop_image(resized, (resized.w - net->w)/2, (resized.h - net->h)/2, net->w, net->h);
+        image resized = resize_min(im, net.w);
+        image crop = crop_image(resized, (resized.w - net.w)/2, (resized.h - net.h)/2, net.w, net.h);
         float *pred = network_predict(net, crop.data);
 
         if(resized.data != im.data) free_image(resized);
@@ -649,7 +649,7 @@ void label_classifier(char *datacfg, char *filename, char *weightfile)
 void csv_classifier(char *datacfg, char *cfgfile, char *weightfile)
 {
     int i,j;
-    network *net = load_network(cfgfile, weightfile, 0);
+    network net = load_network(cfgfile, weightfile, 0);
     srand(time(0));
 
     list *options = read_data_cfg(datacfg);
@@ -668,10 +668,10 @@ void csv_classifier(char *datacfg, char *cfgfile, char *weightfile)
         double time = what_time_is_it_now();
         char *path = paths[i];
         image im = load_image_color(path, 0, 0);
-        image r = letterbox_image(im, net->w, net->h);
+        image r = letterbox_image(im, net.w, net.h);
         float *predictions = network_predict(net, r.data);
-        if(net->hierarchy) hierarchy_predictions(predictions, net->outputs, net->hierarchy, 1, 1);
-        top_k(predictions, net->outputs, top, indexes);
+        if(net.hierarchy) hierarchy_predictions(predictions, net.outputs, net.hierarchy, 1, 1);
+        top_k(predictions, net.outputs, top, indexes);
 
         printf("%s", path);
         for(j = 0; j < top; ++j){
@@ -689,7 +689,7 @@ void csv_classifier(char *datacfg, char *cfgfile, char *weightfile)
 void test_classifier(char *datacfg, char *cfgfile, char *weightfile, int target_layer)
 {
     int curr = 0;
-    network *net = load_network(cfgfile, weightfile, 0);
+    network net = load_network(cfgfile, weightfile, 0);
     srand(time(0));
 
     list *options = read_data_cfg(datacfg);
@@ -708,18 +708,18 @@ void test_classifier(char *datacfg, char *cfgfile, char *weightfile, int target_
     data val, buffer;
 
     load_args args = {0};
-    args.w = net->w;
-    args.h = net->h;
+    args.w = net.w;
+    args.h = net.h;
     args.paths = paths;
     args.classes = classes;
-    args.n = net->batch;
+    args.n = net.batch;
     args.m = 0;
     args.labels = 0;
     args.d = &buffer;
     args.type = OLD_CLASSIFICATION_DATA;
 
     pthread_t load_thread = load_data_in_thread(args);
-    for(curr = net->batch; curr < m; curr += net->batch){
+    for(curr = net.batch; curr < m; curr += net.batch){
         time=clock();
 
         pthread_join(load_thread, 0);
@@ -727,7 +727,7 @@ void test_classifier(char *datacfg, char *cfgfile, char *weightfile, int target_
 
         if(curr < m){
             args.paths = paths + curr;
-            if (curr + net->batch > m) args.n = m - curr;
+            if (curr + net.batch > m) args.n = m - curr;
             load_thread = load_data_in_thread(args);
         }
         fprintf(stderr, "Loaded: %d images in %lf seconds\n", val.X.rows, sec(clock()-time));
@@ -741,7 +741,7 @@ void test_classifier(char *datacfg, char *cfgfile, char *weightfile, int target_
         }
 
         for(i = 0; i < pred.rows; ++i){
-            printf("%s", paths[curr-net->batch+i]);
+            printf("%s", paths[curr-net.batch+i]);
             for(j = 0; j < pred.cols; ++j){
                 printf("\t%g", pred.vals[i][j]);
             }
@@ -758,8 +758,8 @@ void test_classifier(char *datacfg, char *cfgfile, char *weightfile, int target_
 void file_output_classifier(char *datacfg, char *filename, char *weightfile, char *listfile)
 {
     int i,j;
-    network *net = load_network(filename, weightfile, 0);
-    set_batch_network(net, 1);
+    network net = load_network(filename, weightfile, 0);
+    set_batch_network(&net, 1);
     srand(time(0));
 
     list *options = read_data_cfg(datacfg);
@@ -775,11 +775,11 @@ void file_output_classifier(char *datacfg, char *filename, char *weightfile, cha
 
     for(i = 0; i < m; ++i){
         image im = load_image_color(paths[i], 0, 0);
-        image resized = resize_min(im, net->w);
-        image crop = crop_image(resized, (resized.w - net->w)/2, (resized.h - net->h)/2, net->w, net->h);
+        image resized = resize_min(im, net.w);
+        image crop = crop_image(resized, (resized.w - net.w)/2, (resized.h - net.h)/2, net.w, net.h);
 
         float *pred = network_predict(net, crop.data);
-        if(net->hierarchy) hierarchy_predictions(pred, net->outputs, net->hierarchy, 0, 1);
+        if(net.hierarchy) hierarchy_predictions(pred, net.outputs, net.hierarchy, 0, 1);
 
         if(resized.data != im.data) free_image(resized);
         free_image(im);
@@ -801,7 +801,7 @@ void threat_classifier(char *datacfg, char *cfgfile, char *weightfile, int cam_i
     float roll = .2;
 
     printf("Classifier Demo\n");
-    network *net = load_network(cfgfile, weightfile, 0);
+    network net = load_network(cfgfile, weightfile, 0);
     set_batch_network(net, 1);
     list *options = read_data_cfg(datacfg);
 
@@ -830,7 +830,7 @@ void threat_classifier(char *datacfg, char *cfgfile, char *weightfile, int cam_i
 
         image in = get_image_from_stream(cap);
         if(!in.data) break;
-        image in_s = resize_image(in, net->w, net->h);
+        image in_s = resize_image(in, net.w, net.h);
 
         image out = in;
         int x1 = out.w / 20;
@@ -923,7 +923,7 @@ void gun_classifier(char *datacfg, char *cfgfile, char *weightfile, int cam_inde
     int bad_cats[] = {218, 539, 540, 1213, 1501, 1742, 1911, 2415, 4348, 19223, 368, 369, 370, 1133, 1200, 1306, 2122, 2301, 2537, 2823, 3179, 3596, 3639, 4489, 5107, 5140, 5289, 6240, 6631, 6762, 7048, 7171, 7969, 7984, 7989, 8824, 8927, 9915, 10270, 10448, 13401, 15205, 18358, 18894, 18895, 19249, 19697};
 
     printf("Classifier Demo\n");
-    network *net = load_network(cfgfile, weightfile, 0);
+    network net = load_network(cfgfile, weightfile, 0);
     set_batch_network(net, 1);
     list *options = read_data_cfg(datacfg);
 
@@ -946,7 +946,7 @@ void gun_classifier(char *datacfg, char *cfgfile, char *weightfile, int cam_inde
         gettimeofday(&tval_before, NULL);
 
         image in = get_image_from_stream(cap);
-        image in_s = resize_image(in, net->w, net->h);
+        image in_s = resize_image(in, net.w, net.h);
 
         float *predictions = network_predict(net, in_s.data);
         top_predictions(net, top, indexes);
@@ -989,7 +989,7 @@ void demo_classifier(char *datacfg, char *cfgfile, char *weightfile, int cam_ind
     char *base = basecfg(cfgfile);
     image **alphabet = load_alphabet();
     printf("Classifier Demo\n");
-    network *net = load_network(cfgfile, weightfile, 0);
+    network net = load_network(cfgfile, weightfile, 0);
     set_batch_network(net, 1);
     list *options = read_data_cfg(datacfg);
 
@@ -1020,7 +1020,7 @@ void demo_classifier(char *datacfg, char *cfgfile, char *weightfile, int cam_ind
         image in_s = letterbox_image(in, net->w, net->h);
 
         float *predictions = network_predict(net, in_s.data);
-        if(net->hierarchy) hierarchy_predictions(predictions, net->outputs, net->hierarchy, 1, 1);
+        if(net.hierarchy) hierarchy_predictions(predictions, net.outputs, net.hierarchy, 1, 1);
         top_predictions(net, top, indexes);
 
         printf("\033[2J");

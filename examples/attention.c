@@ -15,33 +15,33 @@ void extend_data_truth(data *d, int n, float val)
     d->y.cols += n;
 }
 
-matrix network_loss_data(network *net, data test)
+matrix network_loss_data(network net, data test)
 {
     int i,b;
     int k = 1;
     matrix pred = make_matrix(test.X.rows, k);
-    float *X = calloc(net->batch*test.X.cols, sizeof(float));
-    float *y = calloc(net->batch*test.y.cols, sizeof(float));
-    for(i = 0; i < test.X.rows; i += net->batch){
-        for(b = 0; b < net->batch; ++b){
+    float *X = calloc(net.batch*test.X.cols, sizeof(float));
+    float *y = calloc(net.batch*test.y.cols, sizeof(float));
+    for(i = 0; i < test.X.rows; i += net.batch){
+        for(b = 0; b < net.batch; ++b){
             if(i+b == test.X.rows) break;
             memcpy(X+b*test.X.cols, test.X.vals[i+b], test.X.cols*sizeof(float));
             memcpy(y+b*test.y.cols, test.y.vals[i+b], test.y.cols*sizeof(float));
         }
 
-        network orig = *net;
-        net->input = X;
-        net->truth = y;
-        net->train = 0;
-        net->delta = 0;
+        network orig = net;
+        net.input = X;
+        net.truth = y;
+        net.train = 0;
+        net.delta = 0;
         forward_network(net);
-        *net = orig;
+        net = orig;
 
-        float *delta = net->layers[net->n-1].output;
-        for(b = 0; b < net->batch; ++b){
+        float *delta = net.layers[net.n-1].output;
+        for(b = 0; b < net.batch; ++b){
             if(i+b == test.X.rows) break;
             int t = max_index(y + b*test.y.cols, 1000);
-            float err = sum_array(delta + b*net->outputs, net->outputs);
+            float err = sum_array(delta + b*net.outputs, net.outputs);
             pred.vals[i+b][0] = -err;
             //pred.vals[i+b][0] = 1-delta[b*net->outputs + t];
         }
@@ -60,7 +60,7 @@ void train_attention(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
     char *base = basecfg(cfgfile);
     printf("%s\n", base);
     printf("%d\n", ngpus);
-    network **nets = calloc(ngpus, sizeof(network*));
+    network *nets = calloc(ngpus, sizeof(network));
 
     srand(time(0));
     int seed = rand();
@@ -70,14 +70,14 @@ void train_attention(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
         cuda_set_device(gpus[i]);
 #endif
         nets[i] = load_network(cfgfile, weightfile, clear);
-        nets[i]->learning_rate *= ngpus;
+        nets[i].learning_rate *= ngpus;
     }
     srand(time(0));
-    network *net = nets[0];
+    network net = nets[0];
 
-    int imgs = net->batch * net->subdivisions * ngpus;
+    int imgs = net.batch * net.subdivisions * ngpus;
 
-    printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net->learning_rate, net->momentum, net->decay);
+    printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net.learning_rate, net.momentum, net.decay);
     list *options = read_data_cfg(datacfg);
 
     char *backup_directory = option_find_str(options, "backup", "/backup/");
@@ -96,19 +96,19 @@ void train_attention(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
     int size=2;
 
     load_args args = {0};
-    args.w = divs*net->w/size;
-    args.h = divs*net->h/size;
-    args.size = divs*net->w/size;
+    args.w = divs*net.w/size;
+    args.h = divs*net.h/size;
+    args.size = divs*net.w/size;
     args.threads = 32;
-    args.hierarchy = net->hierarchy;
+    args.hierarchy = net.hierarchy;
 
-    args.min = net->min_ratio*args.w;
-    args.max = net->max_ratio*args.w;
-    args.angle = net->angle;
-    args.aspect = net->aspect;
-    args.exposure = net->exposure;
-    args.saturation = net->saturation;
-    args.hue = net->hue;
+    args.min = net.min_ratio*args.w;
+    args.max = net.max_ratio*args.w;
+    args.angle = net.angle;
+    args.aspect = net.aspect;
+    args.exposure = net.exposure;
+    args.saturation = net.saturation;
+    args.hue = net.hue;
 
     args.paths = paths;
     args.classes = classes;
@@ -123,14 +123,14 @@ void train_attention(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
     args.d = &buffer;
     load_thread = load_data(args);
 
-    int epoch = (*net->seen)/N;
-    while(get_current_batch(net) < net->max_batches || net->max_batches == 0){
+    int epoch = (*net.seen)/N;
+    while(get_current_batch(net) < net.max_batches || net.max_batches == 0){
         time = what_time_is_it_now();
 
         pthread_join(load_thread, 0);
         train = buffer;
         load_thread = load_data(args);
-        data resized = resize_data(train, net->w, net->h);
+        data resized = resize_data(train, net.w, net.h);
         extend_data_truth(&resized, divs*divs, 0);
         data *tiles = tile_data(train, divs, size);
 
@@ -193,7 +193,7 @@ void train_attention(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
         }
 #endif
         for(i = 0; i < divs*divs; ++i){
-            printf("%f ", nets[0]->output[1000 + i]);
+            printf("%f ", nets[0].output[1000 + i]);
             if ((i+1) % divs == 0) printf("\n");
         }
         printf("\n");
@@ -205,9 +205,9 @@ void train_attention(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
         avg_cls_loss = avg_cls_loss*.9 + closs*.1;
         avg_att_loss = avg_att_loss*.9 + aloss*.1;
 
-        printf("%ld, %.3f: Att: %f, %f avg, Class: %f, %f avg, %f rate, %lf seconds, %ld images\n", get_current_batch(net), (float)(*net->seen)/N, aloss, avg_att_loss, closs, avg_cls_loss, get_current_rate(net), what_time_is_it_now()-time, *net->seen);
-        if(*net->seen/N > epoch){
-            epoch = *net->seen/N;
+        printf("%ld, %.3f: Att: %f, %f avg, Class: %f, %f avg, %f rate, %lf seconds, %ld images\n", get_current_batch(net), (float)(*net.seen)/N, aloss, avg_att_loss, closs, avg_cls_loss, get_current_rate(net), what_time_is_it_now()-time, *net.seen);
+        if(*net.seen/N > epoch){
+            epoch = *net.seen/N;
             char buff[256];
             sprintf(buff, "%s/%s_%d.weights",backup_directory,base, epoch);
             save_weights(net, buff);
@@ -233,15 +233,15 @@ void train_attention(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
 void validate_attention_single(char *datacfg, char *filename, char *weightfile)
 {
     int i, j;
-    network *net = load_network(filename, weightfile, 0);
-    set_batch_network(net, 1);
+    network net = load_network(filename, weightfile, 0);
+    set_batch_network(&net, 1);
     srand(time(0));
 
     list *options = read_data_cfg(datacfg);
 
     char *label_list = option_find_str(options, "labels", "data/labels.list");
     char *leaf_list = option_find_str(options, "leaves", 0);
-    if(leaf_list) change_leaves(net->hierarchy, leaf_list);
+    if(leaf_list) change_leaves(net.hierarchy, leaf_list);
     char *valid_list = option_find_str(options, "valid", "data/train.list");
     int classes = option_find_int(options, "classes", 2);
     int topk = option_find_int(options, "top", 1);
@@ -272,9 +272,9 @@ void validate_attention_single(char *datacfg, char *filename, char *weightfile)
             }
         }
         image im = load_image_color(paths[i], 0, 0);
-        image resized = resize_min(im, net->w*divs/size);
-        image crop = crop_image(resized, (resized.w - net->w*divs/size)/2, (resized.h - net->h*divs/size)/2, net->w*divs/size, net->h*divs/size);
-        image rcrop = resize_image(crop, net->w, net->h);
+        image resized = resize_min(im, net.w*divs/size);
+        image crop = crop_image(resized, (resized.w - net.w*divs/size)/2, (resized.h - net.h*divs/size)/2, net.w*divs/size, net.h*divs/size);
+        image rcrop = resize_image(crop, net.w, net.h);
         //show_image(im, "orig");
         //show_image(crop, "cropped");
         //cvWaitKey(0);
@@ -287,21 +287,21 @@ void validate_attention_single(char *datacfg, char *filename, char *weightfile)
         printf("\n");
         copy_cpu(classes, pred, 1, avgs, 1);
         top_k(pred + classes, divs*divs, divs*divs, inds);
-        show_image(crop, "crop");
+        show_image(crop, "crop", 1);
         for(j = 0; j < extra; ++j){
             int index = inds[j];
             int row = index / divs;
             int col = index % divs;
-            int y = row * crop.h / divs - (net->h - crop.h/divs)/2;
-            int x = col * crop.w / divs - (net->w - crop.w/divs)/2;
+            int y = row * crop.h / divs - (net.h - crop.h/divs)/2;
+            int x = col * crop.w / divs - (net.w - crop.w/divs)/2;
             printf("%d %d %d %d\n", row, col, y, x);
-            image tile = crop_image(crop, x, y, net->w, net->h);
+            image tile = crop_image(crop, x, y, net.w, net.h);
             float *pred = network_predict(net, tile.data);
             axpy_cpu(classes, 1., pred, 1, avgs, 1);
-            show_image(tile, "tile");
+            show_image(tile, "tile", 1);
             //cvWaitKey(10);
         }
-        if(net->hierarchy) hierarchy_predictions(pred, net->outputs, net->hierarchy, 1, 1);
+        if(net.hierarchy) hierarchy_predictions(pred, net.outputs, net.hierarchy, 1, 1);
 
         if(rcrop.data != resized.data) free_image(rcrop);
         if(resized.data != im.data) free_image(resized);
@@ -321,8 +321,8 @@ void validate_attention_single(char *datacfg, char *filename, char *weightfile)
 void validate_attention_multi(char *datacfg, char *filename, char *weightfile)
 {
     int i, j;
-    network *net = load_network(filename, weightfile, 0);
-    set_batch_network(net, 1);
+    network net = load_network(filename, weightfile, 0);
+    set_batch_network(&net, 1);
     srand(time(0));
 
     list *options = read_data_cfg(datacfg);
@@ -358,9 +358,9 @@ void validate_attention_multi(char *datacfg, char *filename, char *weightfile)
         image im = load_image_color(paths[i], 0, 0);
         for(j = 0; j < nscales; ++j){
             image r = resize_min(im, scales[j]);
-            resize_network(net, r.w, r.h);
+            resize_network(&net, r.w, r.h);
             float *p = network_predict(net, r.data);
-            if(net->hierarchy) hierarchy_predictions(p, net->outputs, net->hierarchy, 1 , 1);
+            if(net.hierarchy) hierarchy_predictions(p, net.outputs, net.hierarchy, 1 , 1);
             axpy_cpu(classes, 1, p, 1, pred, 1);
             flip_image(r);
             p = network_predict(net, r.data);
@@ -381,8 +381,8 @@ void validate_attention_multi(char *datacfg, char *filename, char *weightfile)
 
 void predict_attention(char *datacfg, char *cfgfile, char *weightfile, char *filename, int top)
 {
-    network *net = load_network(cfgfile, weightfile, 0);
-    set_batch_network(net, 1);
+    network net = load_network(cfgfile, weightfile, 0);
+    set_batch_network(&net, 1);
     srand(2222222);
 
     list *options = read_data_cfg(datacfg);
@@ -408,15 +408,15 @@ void predict_attention(char *datacfg, char *cfgfile, char *weightfile, char *fil
             strtok(input, "\n");
         }
         image im = load_image_color(input, 0, 0);
-        image r = letterbox_image(im, net->w, net->h);
+        image r = letterbox_image(im, net.w, net.h);
         //resize_network(&net, r.w, r.h);
         //printf("%d %d\n", r.w, r.h);
 
         float *X = r.data;
         time=clock();
         float *predictions = network_predict(net, X);
-        if(net->hierarchy) hierarchy_predictions(predictions, net->outputs, net->hierarchy, 1, 1);
-        top_k(predictions, net->outputs, top, indexes);
+        if(net.hierarchy) hierarchy_predictions(predictions, net.outputs, net.hierarchy, 1, 1);
+        top_k(predictions, net.outputs, top, indexes);
         fprintf(stderr, "%s: Predicted in %f seconds.\n", input, sec(clock()-time));
         for(i = 0; i < top; ++i){
             int index = indexes[i];

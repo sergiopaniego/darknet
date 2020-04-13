@@ -355,3 +355,14 @@ box decode_box(box b, box anchor)
     decode.h = pow(2., b.h) * anchor.h;
     return decode;
 }
+
+void c_do_nms_sort(box *boxes, float **probs, int total, int classes, float thresh){
+    return do_nms_sort(boxes,total,classes,thresh);
+    //return do_nms_sort(boxes,probs,total,classes,thresh);
+}
+
+void c_do_nms_obj(box *boxes, float **probs, int total, int classes, float thresh){
+    do_nms_obj(boxes,total,classes,thresh);
+    //do_nms_obj(boxes,probs,total,classes,thresh);
+}
+

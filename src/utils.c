@@ -724,3 +724,12 @@ float **one_hot_encode(float *a, int n, int k)
     return t;
 }
 
+int c_max_index(float *a, int n){
+    return max_index(a,n);
+}
+
+float c_sec(clock_t clocks){
+    return sec(clocks);
+}
+
+

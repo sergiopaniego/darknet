@@ -17,14 +17,14 @@ void train_coco(char *cfgfile, char *weightfile)
     char *base = basecfg(cfgfile);
     printf("%s\n", base);
     float avg_loss = -1;
-    network *net = load_network(cfgfile, weightfile, 0);
-    printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net->learning_rate, net->momentum, net->decay);
-    int imgs = net->batch*net->subdivisions;
-    int i = *net->seen/imgs;
+    network net = load_network(cfgfile, weightfile, 0);
+    printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net.learning_rate, net.momentum, net.decay);
+    int imgs = net.batch*net.subdivisions;
+    int i = *net.seen/imgs;
     data train, buffer;
 
 
-    layer l = net->layers[net->n - 1];
+    layer l = net.layers[net.n - 1];
 
     int side = l.side;
     int classes = l.classes;
@@ -35,8 +35,8 @@ void train_coco(char *cfgfile, char *weightfile)
     char **paths = (char **)list_to_array(plist);
 
     load_args args = {0};
-    args.w = net->w;
-    args.h = net->h;
+    args.w = net.w;
+    args.h = net.h;
     args.paths = paths;
     args.n = imgs;
     args.m = plist->size;
@@ -46,15 +46,15 @@ void train_coco(char *cfgfile, char *weightfile)
     args.d = &buffer;
     args.type = REGION_DATA;
 
-    args.angle = net->angle;
-    args.exposure = net->exposure;
-    args.saturation = net->saturation;
-    args.hue = net->hue;
+    args.angle = net.angle;
+    args.exposure = net.exposure;
+    args.saturation = net.saturation;
+    args.hue = net.hue;
 
     pthread_t load_thread = load_data_in_thread(args);
     clock_t time;
     //while(i*imgs < N*120){
-    while(get_current_batch(net) < net->max_batches){
+    while(get_current_batch(net) < net.max_batches){
         i += 1;
         time=clock();
         pthread_join(load_thread, 0);
@@ -127,9 +127,9 @@ int get_coco_image_id(char *filename)
 
 void validate_coco(char *cfg, char *weights)
 {
-    network *net = load_network(cfg, weights, 0);
-    set_batch_network(net, 1);
-    fprintf(stderr, "Learning Rate: %g, Momentum: %g, Decay: %g\n", net->learning_rate, net->momentum, net->decay);
+    network net = load_network(cfg, weights, 0);
+    set_batch_network(&net, 1);
+    fprintf(stderr, "Learning Rate: %g, Momentum: %g, Decay: %g\n", net.learning_rate, net.momentum, net.decay);
     srand(time(0));
 
     char *base = "results/";
@@ -138,7 +138,7 @@ void validate_coco(char *cfg, char *weights)
     //list *plist = get_paths("/home/pjreddie/data/voc/test/2007_test.txt");
     char **paths = (char **)list_to_array(plist);
 
-    layer l = net->layers[net->n-1];
+    layer l = net.layers[net.n-1];
     int classes = l.classes;
 
     char buff[1024];
@@ -162,8 +162,8 @@ void validate_coco(char *cfg, char *weights)
     pthread_t *thr = calloc(nthreads, sizeof(pthread_t));
 
     load_args args = {0};
-    args.w = net->w;
-    args.h = net->h;
+    args.w = net.w;
+    args.h = net.h;
     args.type = IMAGE_DATA;
 
     for(t = 0; t < nthreads; ++t){
@@ -194,7 +194,7 @@ void validate_coco(char *cfg, char *weights)
             int w = val[t].w;
             int h = val[t].h;
             int nboxes = 0;
-            detection *dets = get_network_boxes(net, w, h, thresh, 0, 0, 0, &nboxes);
+            detection *dets = get_network_boxes(&net, w, h, thresh, 0, 0, 0, &nboxes);
             if (nms) do_nms_sort(dets, l.side*l.side*l.n, classes, iou_thresh);
             print_cocos(fp, image_id, dets, l.side*l.side*l.n, classes, w, h);
             free_detections(dets, nboxes);
@@ -211,16 +211,16 @@ void validate_coco(char *cfg, char *weights)
 
 void validate_coco_recall(char *cfgfile, char *weightfile)
 {
-    network *net = load_network(cfgfile, weightfile, 0);
-    set_batch_network(net, 1);
-    fprintf(stderr, "Learning Rate: %g, Momentum: %g, Decay: %g\n", net->learning_rate, net->momentum, net->decay);
+    network net = load_network(cfgfile, weightfile, 0);
+    set_batch_network(&net, 1);
+    fprintf(stderr, "Learning Rate: %g, Momentum: %g, Decay: %g\n", net.learning_rate, net.momentum, net.decay);
     srand(time(0));
 
     char *base = "results/comp4_det_test_";
     list *plist = get_paths("/home/pjreddie/data/voc/test/2007_test.txt");
     char **paths = (char **)list_to_array(plist);
 
-    layer l = net->layers[net->n-1];
+    layer l = net.layers[net.n-1];
     int classes = l.classes;
     int side = l.side;
 
@@ -247,12 +247,12 @@ void validate_coco_recall(char *cfgfile, char *weightfile)
     for(i = 0; i < m; ++i){
         char *path = paths[i];
         image orig = load_image_color(path, 0, 0);
-        image sized = resize_image(orig, net->w, net->h);
+        image sized = resize_image(orig, net.w, net.h);
         char *id = basecfg(path);
         network_predict(net, sized.data);
 
         int nboxes = 0;
-        detection *dets = get_network_boxes(net, orig.w, orig.h, thresh, 0, 0, 1, &nboxes);
+        detection *dets = get_network_boxes(&net, orig.w, orig.h, thresh, 0, 0, 1, &nboxes);
         if (nms) do_nms_obj(dets, side*side*l.n, 1, nms);
 
         char labelpath[4096];
@@ -294,9 +294,9 @@ void validate_coco_recall(char *cfgfile, char *weightfile)
 void test_coco(char *cfgfile, char *weightfile, char *filename, float thresh)
 {
     image **alphabet = load_alphabet();
-    network *net = load_network(cfgfile, weightfile, 0);
-    layer l = net->layers[net->n-1];
-    set_batch_network(net, 1);
+    network net = load_network(cfgfile, weightfile, 0);
+    layer l = net.layers[net.n-1];
+    set_batch_network(&net, 1);
     srand(2222222);
     float nms = .4;
     clock_t time;
@@ -313,14 +313,14 @@ void test_coco(char *cfgfile, char *weightfile, char *filename, float thresh)
             strtok(input, "\n");
         }
         image im = load_image_color(input,0,0);
-        image sized = resize_image(im, net->w, net->h);
+        image sized = resize_image(im, net.w, net.h);
         float *X = sized.data;
         time=clock();
         network_predict(net, X);
         printf("%s: Predicted in %f seconds.\n", input, sec(clock()-time));
 
         int nboxes = 0;
-        detection *dets = get_network_boxes(net, 1, 1, thresh, 0, 0, 0, &nboxes);
+        detection *dets = get_network_boxes(&net, 1, 1, thresh, 0, 0, 0, &nboxes);
         if (nms) do_nms_sort(dets, l.side*l.side*l.n, l.classes, nms);
 
         draw_detections(im, dets, l.side*l.side*l.n, thresh, coco_classes, alphabet, 80);

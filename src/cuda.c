@@ -26,7 +26,8 @@ int cuda_get_device()
 
 void check_error(cudaError_t status)
 {
-    //cudaDeviceSynchronize();
+    cudaDeviceSynchronize();
+    //printf("CUDA error 1\n");
     cudaError_t status2 = cudaGetLastError();
     if (status != cudaSuccess)
     {   
@@ -152,8 +153,15 @@ void cuda_free(float *x_gpu)
 
 void cuda_push_array(float *x_gpu, float *x, size_t n)
 {
+    printf("cuda push array  1\n");
     size_t size = sizeof(float)*n;
+    printf("cuda push array x: %4.1f \n", *x);
+    printf("cuda push array x_gpu: %4.1f \n", x_gpu);
+    printf("cuda push array size:  %zu \n", size);
+    printf("cuda push array n: %zu \n", n);
+    printf("cuda push array cudaMemcpyHostToDevice:  %i  \n", cudaMemcpyHostToDevice);
     cudaError_t status = cudaMemcpy(x_gpu, x, size, cudaMemcpyHostToDevice);
+    printf("cuda push array  3\n");
     check_error(status);
 }
 

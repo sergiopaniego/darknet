@@ -811,7 +811,8 @@ void letterbox_image_into(image im, int w, int h, image boxed)
 
 image letterbox_image(image im, int w, int h)
 {
-    int new_w = im.w;
+printf("letterbox_image entra!\n");
+    	int new_w = im.w;
     int new_h = im.h;
     if (((float)w/im.w) < ((float)h/im.h)) {
         new_w = w;
@@ -827,6 +828,7 @@ image letterbox_image(image im, int w, int h)
     //for(i = 0; i < boxed.w*boxed.h*boxed.c; ++i) boxed.data[i] = 0;
     embed_image(resized, boxed, (w-new_w)/2, (h-new_h)/2); 
     free_image(resized);
+    printf("Data ->   %4.5f \n", *boxed.data);
     return boxed;
 }
 
@@ -1317,8 +1319,10 @@ image load_image_stb(char *filename, int channels)
 image load_image(char *filename, int w, int h, int c)
 {
 #ifdef OPENCV
+	printf("OPEN CV DEF \n");
     image out = load_image_cv(filename, c);
 #else
+    printf("NO NO NO OPEN CV DEF \n");
     image out = load_image_stb(filename, c);
 #endif
 
@@ -1463,4 +1467,16 @@ void free_image(image m)
     if(m.data){
         free(m.data);
     }
+}
+
+image c_make_image(int w, int h, int c){
+    return make_image(w,h,c);
+}
+
+void c_free_image(image m){
+    free_image(m);
+}
+
+image c_letterbox_image(image im, int w, int h){
+    return letterbox_image(im,w,h);
 }

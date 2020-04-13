@@ -10,7 +10,7 @@ void train_segmenter(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
     char *base = basecfg(cfgfile);
     printf("%s\n", base);
     printf("%d\n", ngpus);
-    network **nets = calloc(ngpus, sizeof(network*));
+    network *nets = calloc(ngpus, sizeof(network));
 
     srand(time(0));
     int seed = rand();
@@ -20,19 +20,19 @@ void train_segmenter(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
         cuda_set_device(gpus[i]);
 #endif
         nets[i] = load_network(cfgfile, weightfile, clear);
-        nets[i]->learning_rate *= ngpus;
+        nets[i].learning_rate *= ngpus;
     }
     srand(time(0));
-    network *net = nets[0];
+    network net = nets[0];
     image pred = get_network_image(net);
 
-    int div = net->w/pred.w;
-    assert(pred.w * div == net->w);
-    assert(pred.h * div == net->h);
+    int div = net.w/pred.w;
+    assert(pred.w * div == net.w);
+    assert(pred.h * div == net.h);
 
-    int imgs = net->batch * net->subdivisions * ngpus;
+    int imgs = net.batch * net.subdivisions * ngpus;
 
-    printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net->learning_rate, net->momentum, net->decay);
+    printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net.learning_rate, net.momentum, net.decay);
     list *options = read_data_cfg(datacfg);
 
     char *backup_directory = option_find_str(options, "backup", "/backup/");
@@ -44,19 +44,19 @@ void train_segmenter(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
     int N = plist->size;
 
     load_args args = {0};
-    args.w = net->w;
-    args.h = net->h;
+    args.w = net.w;
+    args.h = net.h;
     args.threads = 32;
     args.scale = div;
 
-    args.min = net->min_crop;
-    args.max = net->max_crop;
-    args.angle = net->angle;
-    args.aspect = net->aspect;
-    args.exposure = net->exposure;
-    args.saturation = net->saturation;
-    args.hue = net->hue;
-    args.size = net->w;
+    args.min = net.min_crop;
+    args.max = net.max_crop;
+    args.angle = net.angle;
+    args.aspect = net.aspect;
+    args.exposure = net.exposure;
+    args.saturation = net.saturation;
+    args.hue = net.hue;
+    args.size = net.w;
     args.classes = 80;
 
     args.paths = paths;
@@ -70,8 +70,8 @@ void train_segmenter(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
     args.d = &buffer;
     load_thread = load_data(args);
 
-    int epoch = (*net->seen)/N;
-    while(get_current_batch(net) < net->max_batches || net->max_batches == 0){
+    int epoch = (*net.seen)/N;
+    while(get_current_batch(net) < net.max_batches || net.max_batches == 0){
         double time = what_time_is_it_now();
 
         pthread_join(load_thread, 0);
@@ -92,8 +92,8 @@ void train_segmenter(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
         loss = train_network(net, train);
 #endif
         if(display){
-            image tr = float_to_image(net->w/div, net->h/div, 80, train.y.vals[net->batch*(net->subdivisions-1)]);
-            image im = float_to_image(net->w, net->h, net->c, train.X.vals[net->batch*(net->subdivisions-1)]);
+            image tr = float_to_image(net.w/div, net.h/div, 80, train.y.vals[net.batch*(net.subdivisions-1)]);
+            image im = float_to_image(net.w, net.h, net.c, train.X.vals[net.batch*(net.subdivisions-1)]);
             image mask = mask_to_rgb(tr);
             image prmask = mask_to_rgb(pred);
             show_image(im, "input", 1);
@@ -104,10 +104,10 @@ void train_segmenter(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
         }
         if(avg_loss == -1) avg_loss = loss;
         avg_loss = avg_loss*.9 + loss*.1;
-        printf("%ld, %.3f: %f, %f avg, %f rate, %lf seconds, %ld images\n", get_current_batch(net), (float)(*net->seen)/N, loss, avg_loss, get_current_rate(net), what_time_is_it_now()-time, *net->seen);
+        printf("%ld, %.3f: %f, %f avg, %f rate, %lf seconds, %ld images\n", get_current_batch(net), (float)(*net.seen)/N, loss, avg_loss, get_current_rate(net), what_time_is_it_now()-time, *net.seen);
         free_data(train);
-        if(*net->seen/N > epoch){
-            epoch = *net->seen/N;
+        if(*net.seen/N > epoch){
+            epoch = *net.seen/N;
             char buff[256];
             sprintf(buff, "%s/%s_%d.weights",backup_directory,base, epoch);
             save_weights(net, buff);
@@ -130,8 +130,8 @@ void train_segmenter(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
 
 void predict_segmenter(char *datafile, char *cfg, char *weights, char *filename)
 {
-    network *net = load_network(cfg, weights, 0);
-    set_batch_network(net, 1);
+    network net = load_network(cfg, weights, 0);
+    set_batch_network(&net, 1);
     srand(2222222);
 
     clock_t time;
@@ -148,7 +148,7 @@ void predict_segmenter(char *datafile, char *cfg, char *weights, char *filename)
             strtok(input, "\n");
         }
         image im = load_image_color(input, 0, 0);
-        image sized = letterbox_image(im, net->w, net->h);
+        image sized = letterbox_image(im, net.w, net.h);
 
         float *X = sized.data;
         time=clock();
@@ -171,8 +171,8 @@ void demo_segmenter(char *datacfg, char *cfg, char *weights, int cam_index, cons
 {
 #ifdef OPENCV
     printf("Classifier Demo\n");
-    network *net = load_network(cfg, weights, 0);
-    set_batch_network(net, 1);
+    network net = load_network(cfg, weights, 0);
+    set_batch_network(&net, 1);
 
     srand(2222222);
     void * cap = open_video_stream(filename, cam_index, 0,0,0);
@@ -185,7 +185,7 @@ void demo_segmenter(char *datacfg, char *cfg, char *weights, int cam_index, cons
         gettimeofday(&tval_before, NULL);
 
         image in = get_image_from_stream(cap);
-        image in_s = letterbox_image(in, net->w, net->h);
+        image in_s = letterbox_image(in, net.w, net.h);
 
         network_predict(net, in_s.data);
 
